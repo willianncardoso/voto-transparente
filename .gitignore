@@ -1,0 +1,11 @@
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+
+# Backups locais do usuário (nunca versionar dados pessoais)
+meus-votos-backup.json
+*.local.json
