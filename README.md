@@ -3,8 +3,12 @@
 App aberto e sem back-end para ajudar você e sua comunidade a votar com mais informação. Ele reúne:
 
 - **Como votaram** os deputados federais em cada pauta — dados ao vivo da API de Dados Abertos da Câmara.
+- **Buscar & Seguir**: busque parlamentares (por nome/UF) e pautas (por palavra-chave) e adicione a uma lista para acompanhar.
+- **Página de consulta** (`consulta.html`): uma visão enxuta e read-only só do que você segue, com placar das votações mais recentes ao vivo. Boa para consultar no dia a dia.
 - **Links de verificação** nos portais oficiais (TSE, Portal da Transparência, Senado, Câmara).
 - **Meu Voto**: registro de em quem você votou (deste ano ou retroativo), salvo **apenas no seu aparelho**.
+
+Tanto a lista de seguidos quanto os registros de voto ficam no `localStorage` do navegador — nunca saem do aparelho.
 
 ## Privacidade e segurança
 

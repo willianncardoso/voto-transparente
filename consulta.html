@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Consulta — Voto Transparente</title>
+<meta name="description" content="Página de consulta: veja de forma rápida os candidatos e pautas que você segue, com dados ao vivo. Tudo salvo apenas no seu aparelho." />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: { colors: {
+    brand: { 50:'#eefdf3',100:'#d6f7e0',500:'#16a34a',600:'#15803d',700:'#166534' },
+    ink: { 700:'#334155',800:'#1e293b',900:'#0f172a' } } } } }
+</script>
+<style>:focus-visible{outline:3px solid #16a34a;outline-offset:2px;border-radius:4px}</style>
+</head>
+<body class="bg-slate-50 text-ink-800 antialiased">
+
+<header class="bg-white border-b border-slate-200">
+  <div class="max-w-3xl mx-auto px-4 py-5 flex items-center gap-3">
+    <div aria-hidden="true" class="w-10 h-10 rounded-lg bg-brand-500 flex items-center justify-center text-white font-bold">VT</div>
+    <div class="flex-1">
+      <h1 class="text-xl font-bold text-ink-900 leading-tight">Consulta rápida</h1>
+      <p class="text-sm text-ink-700">Seus candidatos e pautas em acompanhamento.</p>
+    </div>
+    <a href="index.html" class="text-sm border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-100 whitespace-nowrap">← Voltar ao app</a>
+  </div>
+  <div class="bg-brand-50 border-t border-brand-100">
+    <div class="max-w-3xl mx-auto px-4 py-2 text-sm text-brand-700 flex items-start gap-2">
+      <span aria-hidden="true">🔒</span>
+      <p>Esta lista fica <strong>só neste aparelho</strong>. Os dados de votação vêm ao vivo da API pública da Câmara.</p>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-3xl mx-auto px-4 py-6 space-y-8">
+  <section aria-labelledby="h-cand">
+    <h2 id="h-cand" class="text-lg font-bold text-ink-900 mb-3">Candidatos / parlamentares</h2>
+    <div id="cand" class="grid sm:grid-cols-2 gap-3"></div>
+  </section>
+
+  <section aria-labelledby="h-pauta">
+    <h2 id="h-pauta" class="text-lg font-bold text-ink-900 mb-3">Pautas</h2>
+    <div id="pauta" class="space-y-3"></div>
+  </section>
+</main>
+
+<footer class="border-t border-slate-200 bg-white mt-8">
+  <div class="max-w-3xl mx-auto px-4 py-6 text-sm text-ink-700">
+    Voto Transparente · Código aberto (MIT). Para buscar e adicionar mais itens, volte ao <a href="index.html" class="text-brand-600 underline">app</a>.
+  </div>
+</footer>
+
+<script>
+const API = "https://dadosabertos.camara.leg.br/api/v2";
+const $ = s => document.querySelector(s);
+const el = (t,cls,html)=>{const e=document.createElement(t); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e;};
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const seg = (()=>{ try{ const s=JSON.parse(localStorage.getItem('voto-transparente:seguindo')); return s&&s.cand?s:{cand:[],pauta:[]}; }catch{ return {cand:[],pauta:[]}; } })();
+const voteColor = v => { const s=(v||'').toLowerCase();
+  if(s.startsWith('sim'))return 'bg-green-100 text-green-800';
+  if(s.startsWith('não')||s.startsWith('nao'))return 'bg-red-100 text-red-800';
+  if(s.includes('obstru'))return 'bg-amber-100 text-amber-800';
+  if(s.includes('absten'))return 'bg-slate-200 text-slate-700';
+  return 'bg-slate-100 text-slate-600'; };
+
+/* Candidatos */
+const cbox = $('#cand');
+if(!seg.cand.length){ cbox.innerHTML = '<p class="text-sm text-ink-700 sm:col-span-2 bg-white border border-slate-200 rounded-xl p-4">Você ainda não segue ninguém. Use o app para buscar e seguir.</p>'; }
+seg.cand.forEach(c => {
+  const perfil = String(c.id).startsWith('local:') ? '' : `https://www.camara.leg.br/deputados/${c.id}`;
+  const card = el('article','bg-white border border-slate-200 rounded-xl p-3 flex gap-3 items-center');
+  card.innerHTML = `${c.foto?`<img src="${esc(c.foto)}" alt="" class="w-11 h-11 rounded-full object-cover bg-slate-100"/>`:'<div aria-hidden="true" class="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center">👤</div>'}
+    <div class="min-w-0"><p class="font-medium text-ink-900 truncate">${esc(c.nome)}</p>
+    <p class="text-xs text-ink-700">${esc(c.partido||'')}${c.uf?'-'+esc(c.uf):''}${perfil?` · <a href="${perfil}" target="_blank" rel="noopener" class="text-brand-600 underline">perfil ↗</a>`:''}</p></div>`;
+  cbox.appendChild(card);
+});
+
+/* Pautas — mostra a votação mais recente com placar */
+const pbox = $('#pauta');
+if(!seg.pauta.length){ pbox.innerHTML = '<p class="text-sm text-ink-700 bg-white border border-slate-200 rounded-xl p-4">Você ainda não segue nenhuma pauta.</p>'; }
+seg.pauta.forEach(p => {
+  const card = el('article','bg-white border border-slate-200 rounded-xl p-4');
+  card.innerHTML = `<div class="flex items-start justify-between gap-3">
+      <div class="min-w-0"><h3 class="font-semibold text-ink-900">${esc(p.titulo)}</h3>
+      <p class="text-sm text-ink-700 mt-0.5">${esc((p.ementa||'').slice(0,200))}</p></div>
+      <a href="https://www.camara.leg.br/propostas-legislativas/${esc(p.id)}" target="_blank" rel="noopener" class="text-sm text-brand-600 underline whitespace-nowrap">Câmara ↗</a></div>
+    <div class="mt-3 text-sm text-ink-700" data-placar>Carregando votação mais recente…</div>`;
+  pbox.appendChild(card);
+  carregarPlacar(p.id, card.querySelector('[data-placar]'));
+});
+async function carregarPlacar(id, box){
+  try {
+    const r = await fetch(`${API}/proposicoes/${id}/votacoes?ordem=DESC&ordenarPor=dataHoraRegistro`);
+    const vts = (await r.json()).dados || [];
+    if(!vts.length){ box.textContent = 'Sem votações nominais registradas.'; return; }
+    const v = vts[0];
+    const rv = await fetch(`${API}/votacoes/${encodeURIComponent(v.id)}/votos?itens=600`);
+    const votos = (await rv.json()).dados || [];
+    const cont = votos.reduce((m,x)=>{ const k=x.tipoVoto||'—'; m[k]=(m[k]||0)+1; return m; },{});
+    const tally = Object.entries(cont).map(([k,n])=>`<span class="px-2 py-0.5 rounded ${voteColor(k)}">${esc(k)}: ${n}</span>`).join(' ');
+    box.innerHTML = `<p class="mb-1"><strong>Votação mais recente:</strong> ${esc((v.data||'').split('-').reverse().join('/'))} — ${esc(v.descricao||'')}</p>
+      <div class="flex flex-wrap gap-2">${tally || 'Sem votos nominais.'}</div>
+      <a href="https://www.camara.leg.br/votacoes/${encodeURIComponent(v.id)}" target="_blank" rel="noopener" class="text-brand-600 underline inline-block mt-2">Ver detalhe da votação ↗</a>`;
+  } catch { box.textContent = 'Erro ao carregar a votação.'; }
+}
+</script>
+</body>
+</html>

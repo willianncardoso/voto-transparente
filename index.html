@@ -3,19 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Voto Transparente — Consulte, compare e registre seu voto</title>
-<meta name="description" content="App aberto para consultar como parlamentares votaram nas pautas, acessar portais de transparência e registrar seu próprio voto — tudo salvo apenas no seu aparelho." />
+<title>Voto Transparente — Consulte, siga e registre seu voto</title>
+<meta name="description" content="App aberto para consultar como parlamentares votaram, seguir candidatos e pautas, acessar portais de transparência e registrar seu voto — tudo salvo apenas no seu aparelho." />
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          brand: { 50:'#eefdf3',100:'#d6f7e0',500:'#16a34a',600:'#15803d',700:'#166534' },
-          ink: { 700:'#334155',800:'#1e293b',900:'#0f172a' }
-        }
-      }
-    }
+    theme: { extend: { colors: {
+      brand: { 50:'#eefdf3',100:'#d6f7e0',500:'#16a34a',600:'#15803d',700:'#166534' },
+      ink: { 700:'#334155',800:'#1e293b',900:'#0f172a' }
+    } } }
   }
 </script>
 <style>
@@ -33,16 +29,16 @@
 <header class="bg-white border-b border-slate-200">
   <div class="max-w-5xl mx-auto px-4 py-5 flex items-center gap-3">
     <div aria-hidden="true" class="w-10 h-10 rounded-lg bg-brand-500 flex items-center justify-center text-white font-bold text-lg">VT</div>
-    <div>
+    <div class="flex-1">
       <h1 class="text-xl font-bold text-ink-900 leading-tight">Voto Transparente</h1>
-      <p class="text-sm text-ink-700">Consulte votações, verifique nos portais oficiais e registre seu voto.</p>
+      <p class="text-sm text-ink-700">Consulte votações, siga candidatos e pautas, e registre seu voto.</p>
     </div>
+    <a href="consulta.html" class="text-sm bg-brand-600 hover:bg-brand-700 text-white px-3 py-2 rounded-lg whitespace-nowrap">Página de consulta ↗</a>
   </div>
-  <!-- Aviso de privacidade -->
   <div class="bg-brand-50 border-t border-brand-100">
     <div class="max-w-5xl mx-auto px-4 py-2 text-sm text-brand-700 flex items-start gap-2">
       <span aria-hidden="true">🔒</span>
-      <p><strong>Privacidade:</strong> nada é enviado ou armazenado em servidores. Seu registro de voto fica salvo <strong>somente neste aparelho</strong> (no navegador). As consultas usam APIs públicas oficiais e não enviam nenhuma informação sua.</p>
+      <p><strong>Privacidade:</strong> nada é enviado ou armazenado em servidores. Sua lista de seguidos e seu registro de voto ficam <strong>somente neste aparelho</strong>. As consultas usam APIs públicas oficiais e não enviam nenhuma informação sua.</p>
     </div>
   </div>
 </header>
@@ -52,7 +48,9 @@
   <div class="max-w-5xl mx-auto px-2">
     <div role="tablist" aria-label="Seções do app" class="flex flex-wrap gap-1">
       <button role="tab" id="tab-votacoes" aria-controls="panel-votacoes" aria-selected="true"
-        class="px-4 py-3 text-sm border-b-2 border-transparent text-ink-700 hover:text-brand-700">Como votaram (Federal)</button>
+        class="px-4 py-3 text-sm border-b-2 border-transparent text-ink-700 hover:text-brand-700">Como votaram</button>
+      <button role="tab" id="tab-acompanhar" aria-controls="panel-acompanhar" aria-selected="false"
+        class="px-4 py-3 text-sm border-b-2 border-transparent text-ink-700 hover:text-brand-700">Buscar & Seguir</button>
       <button role="tab" id="tab-candidatos" aria-controls="panel-candidatos" aria-selected="false"
         class="px-4 py-3 text-sm border-b-2 border-transparent text-ink-700 hover:text-brand-700">Candidatos & Portais</button>
       <button role="tab" id="tab-meuvoto" aria-controls="panel-meuvoto" aria-selected="false"
@@ -70,14 +68,12 @@
     <h2 class="text-lg font-bold text-ink-900 mb-1">Como cada deputado(a) votou</h2>
     <p class="text-sm text-ink-700 mb-4">Dados ao vivo da <a class="text-brand-600 underline" href="https://dadosabertos.camara.leg.br/" target="_blank" rel="noopener">API de Dados Abertos da Câmara dos Deputados</a>. Escolha uma pauta importante ou busque votações recentes.</p>
 
-    <!-- Pautas importantes curadas -->
     <div class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
       <h3 class="font-semibold text-ink-900 mb-3">Pautas importantes</h3>
       <div id="pautas-list" class="grid sm:grid-cols-2 gap-3"></div>
-      <p class="text-xs text-ink-700 mt-3">Edite a lista de pautas no arquivo <code class="bg-slate-100 px-1 rounded">index.html</code> (seção <code class="bg-slate-100 px-1 rounded">PAUTAS_IMPORTANTES</code>). Veja o README para achar o ID de uma votação.</p>
+      <p class="text-xs text-ink-700 mt-3">Edite a lista no arquivo <code class="bg-slate-100 px-1 rounded">index.html</code> (seção <code class="bg-slate-100 px-1 rounded">PAUTAS_IMPORTANTES</code>). Veja o README para achar o ID de uma votação.</p>
     </div>
 
-    <!-- Buscar votações recentes -->
     <div class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
       <h3 class="font-semibold text-ink-900 mb-3">Buscar votações recentes</h3>
       <form id="form-recentes" class="flex flex-wrap items-end gap-3">
@@ -94,7 +90,6 @@
       <div id="recentes-list" class="mt-4 space-y-2" aria-live="polite"></div>
     </div>
 
-    <!-- Resultado da votação selecionada -->
     <div id="votos-box" class="bg-white rounded-xl border border-slate-200 p-4 hidden">
       <div class="flex items-start justify-between gap-3 mb-3">
         <div>
@@ -109,6 +104,49 @@
         <div id="votos-resumo" class="text-sm text-ink-700 flex items-center gap-3 flex-wrap"></div>
       </div>
       <div id="votos-tabela" class="max-h-[480px] overflow-auto rounded-lg border border-slate-100"></div>
+    </div>
+  </section>
+
+  <!-- ============ PANEL: ACOMPANHAR (BUSCAR & SEGUIR) ============ -->
+  <section role="tabpanel" id="panel-acompanhar" aria-labelledby="tab-acompanhar" hidden>
+    <h2 class="text-lg font-bold text-ink-900 mb-1">Buscar & Seguir</h2>
+    <p class="text-sm text-ink-700 mb-4">Encontre candidatos/parlamentares e pautas e adicione à sua lista para seguir. Tudo fica salvo <strong>só neste aparelho</strong>. Veja o resumo na <a href="consulta.html" class="text-brand-600 underline">página de consulta</a>.</p>
+
+    <!-- Buscar candidato -->
+    <div class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
+      <h3 class="font-semibold text-ink-900 mb-3">Buscar candidato / parlamentar</h3>
+      <form id="form-busca-cand" class="flex flex-wrap gap-2">
+        <input id="q-cand" type="search" placeholder="Nome (ex.: Silva)"
+          class="flex-1 min-w-[200px] border border-slate-300 rounded-lg px-3 py-2 text-sm" aria-label="Nome do candidato" />
+        <select id="q-cand-uf" class="border border-slate-300 rounded-lg px-3 py-2 text-sm" aria-label="Filtrar por UF">
+          <option value="">UF (todas)</option>
+        </select>
+        <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg">Buscar</button>
+      </form>
+      <p class="text-xs text-ink-700 mt-2">Busca deputados federais em exercício (API da Câmara) e a lista local de candidatos. Candidaturas 2026 aparecem no TSE mais perto da eleição.</p>
+      <div id="cand-results" class="mt-4 grid sm:grid-cols-2 gap-3" aria-live="polite"></div>
+    </div>
+
+    <!-- Buscar pauta -->
+    <div class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
+      <h3 class="font-semibold text-ink-900 mb-3">Buscar pauta (proposição)</h3>
+      <form id="form-busca-pauta" class="flex flex-wrap gap-2">
+        <input id="q-pauta" type="search" placeholder="Palavra-chave (ex.: saúde, meio ambiente)"
+          class="flex-1 min-w-[220px] border border-slate-300 rounded-lg px-3 py-2 text-sm" aria-label="Palavra-chave da pauta" />
+        <input id="q-pauta-ano" type="number" min="1990" max="2030" placeholder="Ano"
+          class="w-24 border border-slate-300 rounded-lg px-3 py-2 text-sm" aria-label="Ano da proposição" />
+        <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg">Buscar</button>
+      </form>
+      <div id="pauta-results" class="mt-4 space-y-2" aria-live="polite"></div>
+    </div>
+
+    <!-- Seguindo -->
+    <div class="bg-white rounded-xl border border-slate-200 p-4">
+      <h3 class="font-semibold text-ink-900 mb-3">Seguindo</h3>
+      <h4 class="text-sm font-medium text-ink-700 mb-2">Candidatos / parlamentares</h4>
+      <div id="seg-cand" class="grid sm:grid-cols-2 gap-3 mb-5"></div>
+      <h4 class="text-sm font-medium text-ink-700 mb-2">Pautas</h4>
+      <div id="seg-pauta" class="space-y-2"></div>
     </div>
   </section>
 
@@ -189,11 +227,11 @@
   </section>
 
   <!-- ============ PANEL: SOBRE ============ -->
-  <section role="tabpanel" id="panel-sobre" aria-labelledby="tab-sobre" hidden class="prose prose-slate max-w-none">
+  <section role="tabpanel" id="panel-sobre" aria-labelledby="tab-sobre" hidden>
     <h2 class="text-lg font-bold text-ink-900 mb-2">Sobre este projeto</h2>
     <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-3 text-sm text-ink-800">
       <p>Ferramenta aberta e sem fins lucrativos para ajudar você e sua comunidade a votar de forma mais informada. Reúne dados públicos oficiais e links de verificação, com foco nos nomes dos candidatos e no que eles efetivamente votaram.</p>
-      <p><strong>Como funciona a privacidade:</strong> não há back-end nem banco de dados. Seus registros de voto ficam no <code>localStorage</code> do navegador, apenas neste aparelho. Você pode exportar um backup, importar em outro aparelho ou apagar tudo a qualquer momento. As consultas de votações batem direto nas APIs públicas dos órgãos e não enviam nenhum dado seu.</p>
+      <p><strong>Como funciona a privacidade:</strong> não há back-end nem banco de dados. Sua lista de seguidos e seus registros de voto ficam no <code>localStorage</code> do navegador, apenas neste aparelho. Você pode exportar um backup, importar em outro aparelho ou apagar tudo a qualquer momento. As consultas batem direto nas APIs públicas dos órgãos e não enviam nenhum dado seu.</p>
       <p><strong>Fontes de dados:</strong> Câmara dos Deputados (Dados Abertos), Senado Federal, TSE (DivulgaCand/DivulgaContas) e Portal da Transparência.</p>
       <p><strong>Aviso:</strong> confira sempre nas fontes oficiais antes de tirar conclusões. Este app agrega links, não substitui os portais.</p>
     </div>
@@ -211,21 +249,12 @@
 /* =====================================================================
    CONFIGURAÇÃO EDITÁVEL  —  altere aqui, é só isto que você precisa mexer
    ===================================================================== */
-
-// Pautas importantes: cole o ID de uma votação nominal da Câmara.
-// Como achar o ID: veja o README (busque em camara.leg.br ou use "Buscar votações recentes" abaixo — o ID aparece em cada item).
 const PAUTAS_IMPORTANTES = [
   // { id: "2265603-43", titulo: "Exemplo: Marco Temporal", descricao: "Substitua pelos IDs reais das pautas que importam pra você." },
 ];
-
-// Candidatos por nível. Foco no NOME. Adicione quantos quiser.
 const CANDIDATOS = [
   {
-    nome: "Exemplo Candidato",
-    nivel: "Federal",
-    cargo: "Deputado(a) Federal",
-    partido: "—",
-    uf: "SP",
+    nome: "Exemplo Candidato", nivel: "Federal", cargo: "Deputado(a) Federal", partido: "—", uf: "SP",
     resumo: "Edite este item ou apague. Adicione os candidatos da sua região.",
     links: [
       { rotulo: "Ficha no TSE", url: "https://divulgacandcontas.tse.jus.br/" },
@@ -233,8 +262,6 @@ const CANDIDATOS = [
     ]
   }
 ];
-
-// Portais oficiais de verificação (fixos, mas edite se quiser).
 const PORTAIS = [
   { nome: "TSE — Divulgação de Candidaturas", desc: "Candidatos, bens declarados e situação da candidatura.", url: "https://divulgacandcontas.tse.jus.br/" },
   { nome: "Portal da Transparência", desc: "Gastos, salários e benefícios do governo federal.", url: "https://portaltransparencia.gov.br/" },
@@ -248,10 +275,22 @@ const PORTAIS = [
    DAQUI PRA BAIXO: lógica do app. Não precisa editar.
    ===================================================================== */
 const API = "https://dadosabertos.camara.leg.br/api/v2";
+const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const el = (t, cls, html) => { const e=document.createElement(t); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; };
 const esc = s => String(s??"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- Store de "seguindo" (localStorage, só neste aparelho) ---------- */
+const SEG_KEY = 'voto-transparente:seguindo';
+const loadSeg = () => { try { const s = JSON.parse(localStorage.getItem(SEG_KEY)); return s && s.cand ? s : {cand:[],pauta:[]}; } catch { return {cand:[],pauta:[]}; } };
+const saveSeg = s => localStorage.setItem(SEG_KEY, JSON.stringify(s));
+const segueCand = id => loadSeg().cand.some(c => String(c.id)===String(id));
+const seguePauta = id => loadSeg().pauta.some(p => String(p.id)===String(id));
+function toggleCand(obj){ const s=loadSeg(); const i=s.cand.findIndex(c=>String(c.id)===String(obj.id));
+  if(i>=0) s.cand.splice(i,1); else s.cand.push(obj); saveSeg(s); renderSeguindo(); }
+function togglePauta(obj){ const s=loadSeg(); const i=s.pauta.findIndex(p=>String(p.id)===String(obj.id));
+  if(i>=0) s.pauta.splice(i,1); else s.pauta.push(obj); saveSeg(s); renderSeguindo(); }
 
 /* ---------- Tabs (acessível) ---------- */
 const tabs = $$('[role="tab"]');
@@ -264,11 +303,7 @@ tabs.forEach(tab => {
   });
 });
 function selectTab(tab){
-  tabs.forEach(t => {
-    const sel = t === tab;
-    t.setAttribute('aria-selected', sel);
-    $('#'+t.getAttribute('aria-controls')).hidden = !sel;
-  });
+  tabs.forEach(t => { const sel = t === tab; t.setAttribute('aria-selected', sel); $('#'+t.getAttribute('aria-controls')).hidden = !sel; });
 }
 
 /* ---------- Câmara: cores por voto ---------- */
@@ -281,18 +316,17 @@ const voteColor = v => {
   return 'bg-slate-100 text-slate-600';
 };
 
-/* ---------- Renderiza pautas curadas ---------- */
+/* ---------- Pautas curadas ---------- */
 function renderPautas(){
   const box = $('#pautas-list');
   if (!PAUTAS_IMPORTANTES.length){
-    box.innerHTML = '<p class="text-sm text-ink-700 sm:col-span-2">Nenhuma pauta cadastrada ainda. Use a busca abaixo para encontrar votações e copie o ID para a seção <code class="bg-slate-100 px-1 rounded">PAUTAS_IMPORTANTES</code>.</p>';
+    box.innerHTML = '<p class="text-sm text-ink-700 sm:col-span-2">Nenhuma pauta cadastrada ainda. Use a busca abaixo ou a aba <strong>Buscar & Seguir</strong>.</p>';
     return;
   }
   box.innerHTML = '';
   PAUTAS_IMPORTANTES.forEach(p => {
     const c = el('div','border border-slate-200 rounded-lg p-3');
-    c.innerHTML = `<h4 class="font-medium text-ink-900">${esc(p.titulo)}</h4>
-      <p class="text-sm text-ink-700 mt-0.5">${esc(p.descricao||'')}</p>`;
+    c.innerHTML = `<h4 class="font-medium text-ink-900">${esc(p.titulo)}</h4><p class="text-sm text-ink-700 mt-0.5">${esc(p.descricao||'')}</p>`;
     const b = el('button','mt-2 text-sm bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-lg','Ver como votaram');
     b.onclick = () => carregarVotos(p.id, p.titulo);
     c.appendChild(b);
@@ -300,38 +334,33 @@ function renderPautas(){
   });
 }
 
-/* ---------- Busca votações recentes ---------- */
+/* ---------- Votações recentes ---------- */
 $('#form-recentes').addEventListener('submit', async e => {
   e.preventDefault();
-  const dias = +$('#dias').value;
-  const box = $('#recentes-list');
+  const dias = +$('#dias').value, box = $('#recentes-list');
   box.innerHTML = '<p class="text-sm text-ink-700">Carregando…</p>';
-  const fim = new Date(); const ini = new Date(Date.now() - dias*864e5);
-  const fmt = d => d.toISOString().slice(0,10);
+  const fim = new Date(), ini = new Date(Date.now() - dias*864e5), fmt = d => d.toISOString().slice(0,10);
   try {
     const r = await fetch(`${API}/votacoes?dataInicio=${fmt(ini)}&dataFim=${fmt(fim)}&ordem=DESC&ordenarPor=dataHoraRegistro&itens=40`);
     const { dados } = await r.json();
     if (!dados || !dados.length){ box.innerHTML = '<p class="text-sm text-ink-700">Nenhuma votação encontrada no período.</p>'; return; }
     box.innerHTML = '';
     dados.forEach(v => {
-      const row = el('div','flex items-start justify-between gap-3 border border-slate-100 rounded-lg p-3');
       const desc = v.descricao || v.siglaOrgao || 'Votação';
-      row.innerHTML = `<div class="min-w-0">
-          <p class="text-sm text-ink-900 font-medium truncate">${esc(desc)}</p>
-          <p class="text-xs text-ink-700">${esc((v.data||'').split('-').reverse().join('/'))} · ${esc(v.siglaOrgao||'')} · ID ${esc(v.id)}</p>
-        </div>`;
+      const row = el('div','flex items-start justify-between gap-3 border border-slate-100 rounded-lg p-3');
+      row.innerHTML = `<div class="min-w-0"><p class="text-sm text-ink-900 font-medium truncate">${esc(desc)}</p>
+          <p class="text-xs text-ink-700">${esc((v.data||'').split('-').reverse().join('/'))} · ${esc(v.siglaOrgao||'')} · ID ${esc(v.id)}</p></div>`;
       const b = el('button','text-sm text-brand-600 underline whitespace-nowrap','Ver votos');
       b.onclick = () => carregarVotos(v.id, desc);
       row.appendChild(b);
       box.appendChild(row);
     });
-  } catch(err){
-    box.innerHTML = '<p class="text-sm text-red-700">Erro ao consultar a API da Câmara. Tente novamente.</p>';
-  }
+  } catch { box.innerHTML = '<p class="text-sm text-red-700">Erro ao consultar a API da Câmara. Tente novamente.</p>'; }
 });
 
-/* ---------- Carrega votos nominais de uma votação ---------- */
+/* ---------- Votos nominais de uma votação ---------- */
 async function carregarVotos(id, titulo){
+  selectTab($('#tab-votacoes'));
   const box = $('#votos-box'); box.classList.remove('hidden');
   box.scrollIntoView({behavior:'smooth', block:'start'});
   $('#votos-titulo').textContent = titulo || 'Votação';
@@ -341,19 +370,15 @@ async function carregarVotos(id, titulo){
   try {
     const r = await fetch(`${API}/votacoes/${encodeURIComponent(id)}/votos?itens=600`);
     const { dados } = await r.json();
-    const votos = (dados||[]).map(x => {
-      const d = x.deputado_ || x.deputado || {};
-      return { nome:d.nome||'—', partido:d.siglaPartido||'', uf:d.siglaUf||'', foto:d.urlFoto||'', voto:x.tipoVoto||'—' };
-    }).sort((a,b)=>a.nome.localeCompare(b.nome));
+    const votos = (dados||[]).map(x => { const d = x.deputado_ || x.deputado || {};
+      return { nome:d.nome||'—', partido:d.siglaPartido||'', uf:d.siglaUf||'', voto:x.tipoVoto||'—' }; })
+      .sort((a,b)=>a.nome.localeCompare(b.nome));
     window.__votos = votos;
     const cont = votos.reduce((m,v)=>{ const k=(v.voto||'—'); m[k]=(m[k]||0)+1; return m; },{});
     $('#votos-meta').textContent = `${votos.length} parlamentares registrados`;
-    $('#votos-resumo').innerHTML = Object.entries(cont).map(([k,n]) =>
-      `<span class="px-2 py-0.5 rounded ${voteColor(k)}">${esc(k)}: ${n}</span>`).join('');
+    $('#votos-resumo').innerHTML = Object.entries(cont).map(([k,n]) => `<span class="px-2 py-0.5 rounded ${voteColor(k)}">${esc(k)}: ${n}</span>`).join('');
     pintarTabela(votos);
-  } catch(err){
-    $('#votos-meta').textContent = 'Erro ao carregar os votos. Verifique o ID da votação.';
-  }
+  } catch { $('#votos-meta').textContent = 'Erro ao carregar os votos. Verifique o ID da votação.'; }
 }
 function pintarTabela(votos){
   const box = $('#votos-tabela');
@@ -361,8 +386,7 @@ function pintarTabela(votos){
   const rows = votos.map(v => `<tr class="border-b border-slate-50">
       <td class="p-2 text-sm">${esc(v.nome)}</td>
       <td class="p-2 text-sm text-ink-700 whitespace-nowrap">${esc(v.partido)}${v.uf?'-'+esc(v.uf):''}</td>
-      <td class="p-2"><span class="text-xs px-2 py-0.5 rounded ${voteColor(v.voto)}">${esc(v.voto)}</span></td>
-    </tr>`).join('');
+      <td class="p-2"><span class="text-xs px-2 py-0.5 rounded ${voteColor(v.voto)}">${esc(v.voto)}</span></td></tr>`).join('');
   box.innerHTML = `<table class="w-full"><thead class="sticky top-0 bg-slate-50">
     <tr><th class="p-2 text-left text-xs text-ink-700 font-medium">Nome</th>
     <th class="p-2 text-left text-xs text-ink-700 font-medium">Partido</th>
@@ -370,37 +394,150 @@ function pintarTabela(votos){
 }
 $('#filtro-deputado').addEventListener('input', e => {
   const q = e.target.value.toLowerCase();
-  const f = (window.__votos||[]).filter(v =>
-    v.nome.toLowerCase().includes(q) || (v.partido+'-'+v.uf).toLowerCase().includes(q));
-  pintarTabela(f);
+  pintarTabela((window.__votos||[]).filter(v => v.nome.toLowerCase().includes(q) || (v.partido+'-'+v.uf).toLowerCase().includes(q)));
 });
+
+/* ---------- Buscar candidatos / parlamentares ---------- */
+$('#q-cand-uf').innerHTML = '<option value="">UF (todas)</option>' + UFS.map(u=>`<option>${u}</option>`).join('');
+$('#form-busca-cand').addEventListener('submit', async e => {
+  e.preventDefault();
+  const q = $('#q-cand').value.trim(), uf = $('#q-cand-uf').value, box = $('#cand-results');
+  box.innerHTML = '<p class="text-sm text-ink-700 sm:col-span-2">Buscando…</p>';
+  let dep = [];
+  try {
+    const params = new URLSearchParams({ ordem:'ASC', ordenarPor:'nome', itens:'30' });
+    if (q) params.set('nome', q);
+    if (uf) params.set('siglaUf', uf);
+    const r = await fetch(`${API}/deputados?${params}`);
+    dep = (await r.json()).dados || [];
+  } catch {}
+  // candidatos locais
+  const locais = CANDIDATOS.filter(c => (!q || c.nome.toLowerCase().includes(q.toLowerCase())) && (!uf || c.uf===uf))
+    .map(c => ({ id:'local:'+c.nome, nome:c.nome, siglaPartido:c.partido, siglaUf:c.uf, urlFoto:'', fonte:'Lista local', origem:c }));
+  const cams = dep.map(d => ({ id:d.id, nome:d.nome, siglaPartido:d.siglaPartido, siglaUf:d.siglaUf, urlFoto:d.urlFoto, fonte:'Deputado(a) Federal' }));
+  const all = [...cams, ...locais];
+  if (!all.length){ box.innerHTML = '<p class="text-sm text-ink-700 sm:col-span-2">Nenhum resultado. Tente outro nome ou UF.</p>'; return; }
+  box.innerHTML = '';
+  all.forEach(c => box.appendChild(candCard(c)));
+});
+function candCard(c){
+  const seg = segueCand(c.id);
+  const card = el('article','border border-slate-200 rounded-lg p-3 flex gap-3 items-start');
+  card.innerHTML = `
+    ${c.urlFoto?`<img src="${esc(c.urlFoto)}" alt="" class="w-12 h-12 rounded-full object-cover bg-slate-100" />`:'<div aria-hidden="true" class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-ink-700">👤</div>'}
+    <div class="min-w-0 flex-1">
+      <p class="font-medium text-ink-900 truncate">${esc(c.nome)}</p>
+      <p class="text-xs text-ink-700">${esc(c.fonte)}${c.siglaPartido?' · '+esc(c.siglaPartido):''}${c.siglaUf?'-'+esc(c.siglaUf):''}</p>
+    </div>`;
+  const b = el('button', `text-sm px-3 py-1.5 rounded-lg whitespace-nowrap ${seg?'border border-slate-300 text-ink-700 hover:bg-slate-100':'bg-brand-600 hover:bg-brand-700 text-white'}`, seg?'Seguindo ✓':'Seguir');
+  b.onclick = () => { toggleCand({ id:c.id, nome:c.nome, partido:c.siglaPartido||'', uf:c.siglaUf||'', foto:c.urlFoto||'', fonte:c.fonte }); b.replaceWith(candCard(c).lastChild); };
+  card.appendChild(b);
+  return card;
+}
+
+/* ---------- Buscar pautas (proposições) ---------- */
+$('#form-busca-pauta').addEventListener('submit', async e => {
+  e.preventDefault();
+  const q = $('#q-pauta').value.trim(), ano = $('#q-pauta-ano').value.trim(), box = $('#pauta-results');
+  if (!q && !ano){ box.innerHTML = '<p class="text-sm text-ink-700">Digite uma palavra-chave ou um ano.</p>'; return; }
+  box.innerHTML = '<p class="text-sm text-ink-700">Buscando…</p>';
+  try {
+    const params = new URLSearchParams({ ordem:'DESC', ordenarPor:'id', itens:'20' });
+    if (q) params.set('keywords', q);
+    if (ano) params.set('ano', ano);
+    const r = await fetch(`${API}/proposicoes?${params}`);
+    const dados = (await r.json()).dados || [];
+    if (!dados.length){ box.innerHTML = '<p class="text-sm text-ink-700">Nenhuma proposição encontrada.</p>'; return; }
+    box.innerHTML = '';
+    dados.forEach(p => box.appendChild(pautaCard(p)));
+  } catch { box.innerHTML = '<p class="text-sm text-red-700">Erro ao consultar. Tente novamente.</p>'; }
+});
+function pautaCard(p){
+  const titulo = `${p.siglaTipo} ${p.numero}/${p.ano}`;
+  const obj = { id:p.id, titulo, ementa:(p.ementa||'').slice(0,300) };
+  const seg = seguePauta(p.id);
+  const card = el('div','border border-slate-200 rounded-lg p-3');
+  card.innerHTML = `<p class="font-medium text-ink-900">${esc(titulo)}</p><p class="text-sm text-ink-700 mt-0.5">${esc(obj.ementa||'Sem ementa.')}</p>`;
+  const bar = el('div','flex flex-wrap gap-2 mt-2');
+  const bVer = el('button','text-sm text-brand-600 underline','Ver votações');
+  bVer.onclick = () => abrirVotacoesDaProposicao(p.id, titulo);
+  const bSeg = el('button','text-sm px-3 py-1.5 rounded-lg');
+  const paintSeg = () => { const on = seguePauta(p.id);
+    bSeg.className = `text-sm px-3 py-1.5 rounded-lg ${on?'border border-slate-300 text-ink-700 hover:bg-slate-100':'bg-brand-600 hover:bg-brand-700 text-white'}`;
+    bSeg.textContent = on?'Seguindo ✓':'Seguir pauta'; };
+  paintSeg();
+  bSeg.onclick = () => { togglePauta(obj); paintSeg(); };
+  const bLink = el('a','text-sm text-brand-600 underline'); bLink.href=`https://www.camara.leg.br/propostas-legislativas/${p.id}`; bLink.target='_blank'; bLink.rel='noopener'; bLink.textContent='Ver na Câmara ↗';
+  bar.append(bVer, bSeg, bLink); card.appendChild(bar);
+  return card;
+}
+async function abrirVotacoesDaProposicao(id, titulo){
+  const box = $('#pauta-results');
+  const note = el('div','text-sm text-ink-700 border border-slate-100 rounded-lg p-3 mt-2','Carregando votações…');
+  box.appendChild(note);
+  try {
+    const r = await fetch(`${API}/proposicoes/${id}/votacoes?ordem=DESC&ordenarPor=dataHoraRegistro`);
+    const dados = (await r.json()).dados || [];
+    if (!dados.length){ note.textContent = 'Esta proposição não tem votações nominais registradas na Câmara.'; return; }
+    note.innerHTML = `<p class="font-medium text-ink-900 mb-1">Votações de ${esc(titulo)}</p>`;
+    dados.forEach(v => {
+      const b = el('button','block text-left text-sm text-brand-600 underline my-1', `${esc((v.data||'').split('-').reverse().join('/'))} — ${esc(v.descricao||'ver votos')}`);
+      b.onclick = () => carregarVotos(v.id, `${titulo} — ${v.descricao||''}`);
+      note.appendChild(b);
+    });
+  } catch { note.textContent = 'Erro ao carregar votações.'; }
+}
+
+/* ---------- Render "Seguindo" ---------- */
+function renderSeguindo(){
+  const s = loadSeg();
+  const bc = $('#seg-cand');
+  bc.innerHTML = s.cand.length ? '' : '<p class="text-sm text-ink-700 sm:col-span-2">Você ainda não segue ninguém.</p>';
+  s.cand.forEach(c => {
+    const card = el('article','border border-slate-200 rounded-lg p-3 flex gap-3 items-center');
+    const perfil = String(c.id).startsWith('local:') ? '' : `https://www.camara.leg.br/deputados/${c.id}`;
+    card.innerHTML = `${c.foto?`<img src="${esc(c.foto)}" alt="" class="w-10 h-10 rounded-full object-cover bg-slate-100"/>`:'<div aria-hidden="true" class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">👤</div>'}
+      <div class="min-w-0 flex-1"><p class="font-medium text-ink-900 truncate">${esc(c.nome)}</p>
+      <p class="text-xs text-ink-700">${esc(c.partido||'')}${c.uf?'-'+esc(c.uf):''}${perfil?` · <a href="${perfil}" target="_blank" rel="noopener" class="text-brand-600 underline">perfil ↗</a>`:''}</p></div>`;
+    const b = el('button','text-sm text-red-700 hover:underline','Deixar de seguir');
+    b.onclick = () => toggleCand(c);
+    card.appendChild(b); bc.appendChild(card);
+  });
+  const bp = $('#seg-pauta');
+  bp.innerHTML = s.pauta.length ? '' : '<p class="text-sm text-ink-700">Você ainda não segue nenhuma pauta.</p>';
+  s.pauta.forEach(p => {
+    const row = el('div','flex items-start justify-between gap-3 border border-slate-200 rounded-lg p-3');
+    row.innerHTML = `<div class="min-w-0"><p class="font-medium text-ink-900">${esc(p.titulo)}</p><p class="text-sm text-ink-700">${esc((p.ementa||'').slice(0,160))}</p></div>`;
+    const wrap = el('div','flex flex-col gap-1 items-end');
+    const bVer = el('button','text-sm text-brand-600 underline whitespace-nowrap','Ver votações');
+    bVer.onclick = () => abrirVotacoesDaProposicao(p.id, p.titulo);
+    const b = el('button','text-sm text-red-700 hover:underline whitespace-nowrap','Deixar de seguir');
+    b.onclick = () => togglePauta(p);
+    wrap.append(bVer, b); row.appendChild(wrap); bp.appendChild(row);
+  });
+}
 
 /* ---------- Portais e candidatos ---------- */
 function renderPortais(){
   $('#portais-list').innerHTML = PORTAIS.map(p => `
-    <a href="${esc(p.url)}" target="_blank" rel="noopener"
-       class="block border border-slate-200 rounded-lg p-3 hover:border-brand-500 hover:bg-brand-50">
+    <a href="${esc(p.url)}" target="_blank" rel="noopener" class="block border border-slate-200 rounded-lg p-3 hover:border-brand-500 hover:bg-brand-50">
       <span class="font-medium text-ink-900">${esc(p.nome)} ↗</span>
-      <span class="block text-sm text-ink-700 mt-0.5">${esc(p.desc)}</span>
-    </a>`).join('');
+      <span class="block text-sm text-ink-700 mt-0.5">${esc(p.desc)}</span></a>`).join('');
 }
 function renderCandidatos(){
   const nivel = $('#filtro-nivel').value;
-  const list = CANDIDATOS.filter(c => !nivel || c.nivel===nivel);
-  const box = $('#candidatos-list');
+  const list = CANDIDATOS.filter(c => !nivel || c.nivel===nivel), box = $('#candidatos-list');
   if (!list.length){ box.innerHTML='<p class="text-sm text-ink-700">Nenhum candidato neste filtro.</p>'; return; }
   box.innerHTML = list.map(c => `
     <article class="bg-white border border-slate-200 rounded-xl p-4">
       <div class="flex items-center justify-between gap-2">
         <h4 class="font-semibold text-ink-900">${esc(c.nome)}</h4>
-        <span class="text-xs px-2 py-0.5 rounded bg-brand-50 text-brand-700">${esc(c.nivel)}</span>
-      </div>
+        <span class="text-xs px-2 py-0.5 rounded bg-brand-50 text-brand-700">${esc(c.nivel)}</span></div>
       <p class="text-sm text-ink-700 mt-0.5">${esc(c.cargo)} · ${esc(c.partido||'—')}${c.uf?' · '+esc(c.uf):''}</p>
       <p class="text-sm text-ink-800 mt-2">${esc(c.resumo||'')}</p>
       <div class="flex flex-wrap gap-2 mt-3">
         ${(c.links||[]).map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="text-sm text-brand-600 underline">${esc(l.rotulo)} ↗</a>`).join('')}
-      </div>
-    </article>`).join('');
+      </div></article>`).join('');
 }
 $('#filtro-nivel').addEventListener('change', renderCandidatos);
 
@@ -408,65 +545,42 @@ $('#filtro-nivel').addEventListener('change', renderCandidatos);
 const KEY = 'voto-transparente:meus-votos';
 const loadVotos = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
 const saveVotos = v => localStorage.setItem(KEY, JSON.stringify(v));
-
 $('#form-voto').addEventListener('submit', e => {
   e.preventDefault();
-  const reg = {
-    id: Date.now(),
-    ano: $('#v-ano').value,
-    cargo: $('#v-cargo').value,
-    nome: $('#v-nome').value.trim(),
-    partido: $('#v-partido').value.trim(),
-    nota: $('#v-nota').value.trim()
-  };
-  const v = loadVotos(); v.push(reg); saveVotos(v);
-  e.target.reset(); renderMeusVotos();
+  const reg = { id:Date.now(), ano:$('#v-ano').value, cargo:$('#v-cargo').value, nome:$('#v-nome').value.trim(), partido:$('#v-partido').value.trim(), nota:$('#v-nota').value.trim() };
+  const v = loadVotos(); v.push(reg); saveVotos(v); e.target.reset(); renderMeusVotos();
 });
 function renderMeusVotos(){
-  const box = $('#meus-votos');
-  const v = loadVotos().sort((a,b)=> (b.ano-a.ano) || (b.id-a.id));
+  const box = $('#meus-votos'), v = loadVotos().sort((a,b)=> (b.ano-a.ano) || (b.id-a.id));
   if (!v.length){ box.innerHTML='<p class="text-sm text-ink-700 bg-white border border-slate-200 rounded-xl p-4">Nenhum registro ainda. Use o formulário acima.</p>'; return; }
   box.innerHTML = v.map(r => `
     <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-start justify-between gap-3">
-      <div>
-        <p class="text-sm"><span class="font-semibold text-ink-900">${esc(r.nome)}</span>
-          <span class="text-ink-700">— ${esc(r.cargo)} · ${esc(r.ano)}${r.partido?' · '+esc(r.partido):''}</span></p>
-        ${r.nota?`<p class="text-sm text-ink-700 mt-1">${esc(r.nota)}</p>`:''}
-      </div>
+      <div><p class="text-sm"><span class="font-semibold text-ink-900">${esc(r.nome)}</span>
+        <span class="text-ink-700">— ${esc(r.cargo)} · ${esc(r.ano)}${r.partido?' · '+esc(r.partido):''}</span></p>
+        ${r.nota?`<p class="text-sm text-ink-700 mt-1">${esc(r.nota)}</p>`:''}</div>
       <button data-del="${r.id}" class="text-sm text-red-700 hover:underline whitespace-nowrap" aria-label="Apagar registro de ${esc(r.nome)}">Apagar</button>
     </div>`).join('');
-  $$('[data-del]', box).forEach(b => b.onclick = () => {
-    saveVotos(loadVotos().filter(x => x.id != b.dataset.del)); renderMeusVotos();
-  });
+  $$('[data-del]', box).forEach(b => b.onclick = () => { saveVotos(loadVotos().filter(x => x.id != b.dataset.del)); renderMeusVotos(); });
 }
 $('#btn-export').onclick = () => {
   const blob = new Blob([JSON.stringify(loadVotos(),null,2)], {type:'application/json'});
-  const a = el('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'meus-votos-backup.json'; a.click(); URL.revokeObjectURL(a.href);
+  const a = el('a'); a.href = URL.createObjectURL(blob); a.download = 'meus-votos-backup.json'; a.click(); URL.revokeObjectURL(a.href);
 };
 $('#file-import').onchange = e => {
   const f = e.target.files[0]; if(!f) return;
   const rd = new FileReader();
-  rd.onload = () => {
-    try {
-      const imp = JSON.parse(rd.result);
-      if (!Array.isArray(imp)) throw 0;
-      const cur = loadVotos(); const ids = new Set(cur.map(x=>x.id));
+  rd.onload = () => { try {
+      const imp = JSON.parse(rd.result); if (!Array.isArray(imp)) throw 0;
+      const cur = loadVotos(), ids = new Set(cur.map(x=>x.id));
       imp.forEach(x => { if(!ids.has(x.id)) cur.push(x); });
-      saveVotos(cur); renderMeusVotos();
-      alert('Registros importados.');
-    } catch { alert('Arquivo inválido.'); }
-  };
+      saveVotos(cur); renderMeusVotos(); alert('Registros importados.');
+    } catch { alert('Arquivo inválido.'); } };
   rd.readAsText(f); e.target.value = '';
 };
-$('#btn-clear').onclick = () => {
-  if (confirm('Apagar TODOS os seus registros deste aparelho? Isso não pode ser desfeito.')) {
-    localStorage.removeItem(KEY); renderMeusVotos();
-  }
-};
+$('#btn-clear').onclick = () => { if (confirm('Apagar TODOS os seus registros deste aparelho? Isso não pode ser desfeito.')) { localStorage.removeItem(KEY); renderMeusVotos(); } };
 
 /* ---------- Init ---------- */
-renderPautas(); renderPortais(); renderCandidatos(); renderMeusVotos();
+renderPautas(); renderPortais(); renderCandidatos(); renderMeusVotos(); renderSeguindo();
 </script>
 </body>
 </html>
