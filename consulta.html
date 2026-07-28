@@ -39,8 +39,9 @@
   </section>
 
   <section aria-labelledby="h-pauta">
-    <h2 id="h-pauta" class="text-lg font-bold text-ink-900 mb-3">Pautas</h2>
-    <div id="pauta" class="space-y-3"></div>
+    <h2 id="h-pauta" class="text-lg font-bold text-ink-900 mb-1">Pautas</h2>
+    <p class="text-sm text-ink-700 mb-3">Agrupadas pela situação atual na Câmara.</p>
+    <div id="pauta" class="space-y-6" aria-live="polite"></div>
   </section>
 </main>
 
@@ -52,9 +53,24 @@
 
 <script>
 const API = "https://dadosabertos.camara.leg.br/api/v2";
+const API_SENADO = "https://legis.senado.leg.br/dadosabertos";
 const $ = s => document.querySelector(s);
 const el = (t,cls,html)=>{const e=document.createElement(t); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e;};
 const esc = s => String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const norm = s => String(s??"").toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
+const dataBR = d => String(d??"").slice(0,10).split('-').reverse().join('/');
+/* as APIs públicas falham de forma intermitente; uma segunda tentativa resolve a maioria */
+async function apiJSON(url, opts, tentativas = 2){
+  let ultimo;
+  for (let i = 0; i < tentativas; i++){
+    try {
+      const r = await fetch(url, opts);
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      return await r.json();
+    } catch (e) { ultimo = e; if (i < tentativas-1) await new Promise(res => setTimeout(res, 600)); }
+  }
+  throw ultimo;
+}
 /* id de seguido: "local:Nome" (lista local), "sen:123" (Senado), numérico puro (Câmara) */
 function perfilUrl(id){
   const s = String(id??"");
@@ -70,46 +86,166 @@ const voteColor = v => { const s=(v||'').toLowerCase();
   if(s.includes('absten'))return 'bg-slate-200 text-slate-700';
   return 'bg-slate-100 text-slate-600'; };
 
-/* Candidatos */
-const cbox = $('#cand');
-if(!seg.cand.length){ cbox.innerHTML = '<p class="text-sm text-ink-700 sm:col-span-2 bg-white border border-slate-200 rounded-xl p-4">Você ainda não segue ninguém. Use o app para buscar e seguir.</p>'; }
-seg.cand.forEach(c => {
-  const perfil = perfilUrl(c.id);
-  const card = el('article','bg-white border border-slate-200 rounded-xl p-3 flex gap-3 items-center');
-  card.innerHTML = `${c.foto?`<img src="${esc(c.foto)}" alt="" class="w-11 h-11 rounded-full object-cover bg-slate-100"/>`:'<div aria-hidden="true" class="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center">👤</div>'}
-    <div class="min-w-0"><p class="font-medium text-ink-900 truncate">${esc(c.nome)}</p>
-    <p class="text-xs text-ink-700">${esc(c.partido||'')}${c.uf?'-'+esc(c.uf):''}${perfil?` · <a href="${perfil}" target="_blank" rel="noopener" class="text-brand-600 underline">perfil ↗</a>`:''}</p></div>`;
-  cbox.appendChild(card);
-});
-
-/* Pautas — mostra a votação mais recente com placar */
-const pbox = $('#pauta');
-if(!seg.pauta.length){ pbox.innerHTML = '<p class="text-sm text-ink-700 bg-white border border-slate-200 rounded-xl p-4">Você ainda não segue nenhuma pauta.</p>'; }
-seg.pauta.forEach(p => {
+/* =======================================================================
+   PAUTAS — agrupadas pela situação atual da proposição
+   ======================================================================= */
+const GRUPOS = [
+  { chave:'tramitando', rotulo:'Em tramitação',          nota:'Ainda em discussão — é onde a pressão popular pesa.' },
+  { chave:'lei',        rotulo:'Viraram lei ou norma',   nota:'Concluídas: viraram norma jurídica.' },
+  { chave:'rejeitada',  rotulo:'Rejeitadas',             nota:'Recusadas em votação.' },
+  { chave:'arquivada',  rotulo:'Arquivadas ou retiradas',nota:'Saíram de pauta sem virar norma.' },
+  { chave:'indefinido', rotulo:'Situação não disponível',nota:'A Câmara não informou a situação agora.' },
+];
+function classificarSituacao(situacao){
+  const s = norm(situacao);
+  if (!s) return 'indefinido';
+  if (/transformad|norma juridica|convertid|sancion|promulgad/.test(s)) return 'lei';
+  if (/rejeitad/.test(s)) return 'rejeitada';
+  if (/arquivad|retirad|prejudicad|devolvid/.test(s)) return 'arquivada';
+  return 'tramitando';
+}
+function pautaCard(p){
   const card = el('article','bg-white border border-slate-200 rounded-xl p-4');
   card.innerHTML = `<div class="flex items-start justify-between gap-3">
-      <div class="min-w-0"><h3 class="font-semibold text-ink-900">${esc(p.titulo)}</h3>
-      <p class="text-sm text-ink-700 mt-0.5">${esc((p.ementa||'').slice(0,200))}</p></div>
-      <a href="https://www.camara.leg.br/propostas-legislativas/${esc(p.id)}" target="_blank" rel="noopener" class="text-sm text-brand-600 underline whitespace-nowrap">Câmara ↗</a></div>
+      <div class="min-w-0"><h4 class="font-semibold text-ink-900">${esc(p.titulo)}</h4>
+      <p class="text-sm text-ink-700 mt-0.5">${esc((p.ementa||'').slice(0,200))}</p>
+      ${p.situacao?`<p class="text-xs text-ink-700 mt-1"><strong>Situação:</strong> ${esc(p.situacao)}</p>`:''}</div>
+      <a href="https://www.camara.leg.br/propostas-legislativas/${encodeURIComponent(p.id)}" target="_blank" rel="noopener" class="text-sm text-brand-600 underline whitespace-nowrap">Câmara ↗</a></div>
     <div class="mt-3 text-sm text-ink-700" data-placar>Carregando votação mais recente…</div>`;
-  pbox.appendChild(card);
-  carregarPlacar(p.id, card.querySelector('[data-placar]'));
-});
+  return card;
+}
+async function renderPautas(){
+  const box = $('#pauta');
+  if(!seg.pauta.length){
+    box.innerHTML = '<p class="text-sm text-ink-700 bg-white border border-slate-200 rounded-xl p-4">Você ainda não segue nenhuma pauta.</p>';
+    return [];
+  }
+  box.innerHTML = '<p class="text-sm text-ink-700">Carregando situação das pautas…</p>';
+  const infos = await Promise.all(seg.pauta.map(async p => {
+    let situacao = null;
+    try {
+      const st = ((await apiJSON(`${API}/proposicoes/${encodeURIComponent(p.id)}`)).dados||{}).statusProposicao || {};
+      situacao = st.descricaoSituacao || st.descricaoTramitacao || null;
+    } catch {}
+    return { ...p, situacao, grupo: classificarSituacao(situacao) };
+  }));
+  box.innerHTML = '';
+  const placares = [];
+  GRUPOS.forEach((g, gi) => {
+    const itens = infos.filter(i => i.grupo === g.chave);
+    if (!itens.length) return;
+    const sec = el('section','space-y-3');
+    const hid = 'grp-'+g.chave;
+    sec.setAttribute('aria-labelledby', hid);
+    sec.appendChild(el('div','', `<h3 id="${hid}" class="font-bold text-ink-900">${esc(g.rotulo)} <span class="text-sm font-normal text-ink-700">(${itens.length})</span></h3>
+      <p class="text-xs text-ink-700">${esc(g.nota)}</p>`));
+    itens.forEach(i => {
+      const card = pautaCard(i);
+      sec.appendChild(card);
+      placares.push(carregarPlacar(i.id, card.querySelector('[data-placar]')));
+    });
+    box.appendChild(sec);
+  });
+  return placares;
+}
+
+/* Placar da votação mais recente. De quebra, registra a data em que cada
+   deputado seguido aparece votando — a Câmara não expõe isso por parlamentar. */
+const ultimoVotoDeputado = new Map();
+const idsDepSeguidos = new Set(seg.cand.filter(c => /^\d+$/.test(String(c.id))).map(c => String(c.id)));
 async function carregarPlacar(id, box){
   try {
-    const r = await fetch(`${API}/proposicoes/${id}/votacoes?ordem=DESC&ordenarPor=dataHoraRegistro`);
-    const vts = (await r.json()).dados || [];
+    const vts = (await apiJSON(`${API}/proposicoes/${encodeURIComponent(id)}/votacoes?ordem=DESC&ordenarPor=dataHoraRegistro`)).dados || [];
     if(!vts.length){ box.textContent = 'Sem votações nominais registradas.'; return; }
     const v = vts[0];
-    const rv = await fetch(`${API}/votacoes/${encodeURIComponent(v.id)}/votos?itens=600`);
-    const votos = (await rv.json()).dados || [];
+    const votos = (await apiJSON(`${API}/votacoes/${encodeURIComponent(v.id)}/votos`)).dados || [];
+    if (idsDepSeguidos.size) votos.forEach(x => {
+      const d = x.deputado_ || x.deputado || {}, k = String(d.id);
+      if (!idsDepSeguidos.has(k)) return;
+      const atual = ultimoVotoDeputado.get(k);
+      if (!atual || (v.data||'') > atual.data) ultimoVotoDeputado.set(k, { data: v.data||'', voto: x.tipoVoto||'—', materia: v.descricao||'' });
+    });
+    const linha = `<p class="mb-1"><strong>Votação mais recente:</strong> ${esc(dataBR(v.data))} — ${esc(v.descricao||'')}</p>`;
+    if(!votos.length){
+      box.innerHTML = linha + '<p>Sem votos nominais nessa votação (foi simbólica ou de comissão).</p>' +
+        `<a href="https://www.camara.leg.br/votacoes/${encodeURIComponent(v.id)}" target="_blank" rel="noopener" class="text-brand-600 underline inline-block mt-2">Ver detalhe da votação ↗</a>`;
+      return;
+    }
     const cont = votos.reduce((m,x)=>{ const k=x.tipoVoto||'—'; m[k]=(m[k]||0)+1; return m; },{});
     const tally = Object.entries(cont).map(([k,n])=>`<span class="px-2 py-0.5 rounded ${voteColor(k)}">${esc(k)}: ${n}</span>`).join(' ');
-    box.innerHTML = `<p class="mb-1"><strong>Votação mais recente:</strong> ${esc((v.data||'').split('-').reverse().join('/'))} — ${esc(v.descricao||'')}</p>
-      <div class="flex flex-wrap gap-2">${tally || 'Sem votos nominais.'}</div>
+    box.innerHTML = linha + `<div class="flex flex-wrap gap-2">${tally}</div>
       <a href="https://www.camara.leg.br/votacoes/${encodeURIComponent(v.id)}" target="_blank" rel="noopener" class="text-brand-600 underline inline-block mt-2">Ver detalhe da votação ↗</a>`;
-  } catch { box.textContent = 'Erro ao carregar a votação.'; }
+  } catch { box.textContent = 'Erro ao carregar a votação. Tente recarregar a página.'; }
 }
+
+/* =======================================================================
+   PARLAMENTARES — com a data da última votação, quando disponível
+   ======================================================================= */
+function candCard(c){
+  const perfil = perfilUrl(c.id);
+  const card = el('article','bg-white border border-slate-200 rounded-xl p-3');
+  card.innerHTML = `<div class="flex gap-3 items-center">
+      ${c.foto?`<img src="${esc(c.foto)}" alt="" class="w-11 h-11 rounded-full object-cover bg-slate-100"/>`:'<div aria-hidden="true" class="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center">👤</div>'}
+      <div class="min-w-0 flex-1"><p class="font-medium text-ink-900 truncate">${esc(c.nome)}</p>
+      <p class="text-xs text-ink-700">${esc(c.partido||'')}${c.uf?'-'+esc(c.uf):''}${perfil?` · <a href="${perfil}" target="_blank" rel="noopener" class="text-brand-600 underline">perfil ↗</a>`:''}</p></div>
+    </div>
+    <p class="text-sm text-ink-700 mt-2 pt-2 border-t border-slate-100" data-ultima>—</p>`;
+  return card;
+}
+/* Senado publica o histórico de votos por senador; a Câmara não. */
+async function ultimaVotacaoSenador(cod){
+  const f = d => d.toISOString().slice(0,10);
+  const url = `${API_SENADO}/votacao?codigoParlamentar=${encodeURIComponent(cod)}&dataInicio=${f(new Date(Date.now()-365*864e5))}&dataFim=${f(new Date())}`;
+  const lista = await apiJSON(url, { headers:{ Accept:'application/json' } });
+  if (!Array.isArray(lista) || !lista.length) return null;
+  const r = lista.reduce((a,b) => (a.dataSessao||'') >= (b.dataSessao||'') ? a : b);
+  return { data: r.dataSessao, materia: r.identificacao || '', voto: ((r.votos||[])[0]||{}).siglaVotoParlamentar || '' };
+}
+function textoUltima(u){
+  if (!u || !u.data) return 'Sem votação nominal registrada.';
+  const voto = u.voto ? ` <span class="px-2 py-0.5 rounded ${voteColor(u.voto)}">${esc(u.voto)}</span>` : '';
+  const m = String(u.materia||'').trim();
+  const materia = m ? `<span class="block text-xs text-ink-700 mt-0.5">${esc(m.length>90 ? m.slice(0,90)+'…' : m)}</span>` : '';
+  return `<strong>Última votação:</strong> ${esc(dataBR(u.data))}${voto}${materia}`;
+}
+async function renderCands(placares){
+  const box = $('#cand');
+  if(!seg.cand.length){
+    box.innerHTML = '<p class="text-sm text-ink-700 sm:col-span-2 bg-white border border-slate-200 rounded-xl p-4">Você ainda não segue ninguém. Use o app para buscar e seguir.</p>';
+    return;
+  }
+  box.innerHTML = '';
+  const slots = seg.cand.map(c => { const card = candCard(c); box.appendChild(card); return [c, card.querySelector('[data-ultima]')]; });
+
+  slots.forEach(([c, slot]) => {
+    const id = String(c.id);
+    if (id.startsWith('local:')) { slot.textContent = 'Candidato da lista local — sem dados de votação.'; return; }
+    if (id.startsWith('sen:')) {
+      slot.textContent = 'Buscando última votação…';
+      ultimaVotacaoSenador(id.slice(4))
+        .then(u => { slot.innerHTML = u ? textoUltima(u) : 'Sem votação nominal no último ano.'; })
+        .catch(() => { slot.textContent = 'Não foi possível consultar as votações no Senado agora.'; });
+      return;
+    }
+    slot.textContent = 'Buscando última votação…';
+  });
+
+  /* Deputados: sem endpoint por parlamentar na Câmara, a data sai das
+     votações já carregadas para as pautas seguidas. */
+  await Promise.allSettled(placares || []);
+  slots.forEach(([c, slot]) => {
+    const id = String(c.id);
+    if (id.startsWith('sen:') || id.startsWith('local:')) return;
+    const u = ultimoVotoDeputado.get(id);
+    slot.innerHTML = u ? textoUltima(u)
+      : (seg.pauta.length
+          ? 'Não votou nas votações mais recentes das pautas que você segue.'
+          : 'Siga alguma pauta para ver a última votação deste deputado — a Câmara não publica o histórico por parlamentar.');
+  });
+}
+
+/* ---------- Init ---------- */
+renderPautas().then(renderCands);
 </script>
 </body>
 </html>
