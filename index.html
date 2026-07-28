@@ -92,11 +92,14 @@
 
     <div id="votos-box" class="bg-white rounded-xl border border-slate-200 p-4 hidden">
       <div class="flex items-start justify-between gap-3 mb-3">
-        <div>
+        <div class="min-w-0">
           <h3 id="votos-titulo" class="font-semibold text-ink-900"></h3>
           <p id="votos-meta" class="text-sm text-ink-700"></p>
         </div>
-        <a id="votos-link" href="#" target="_blank" rel="noopener" class="text-sm text-brand-600 underline whitespace-nowrap">Fonte oficial ↗</a>
+        <div class="flex flex-col items-end gap-2 shrink-0">
+          <a id="votos-link" href="#" target="_blank" rel="noopener" class="text-sm text-brand-600 underline whitespace-nowrap">Fonte oficial ↗</a>
+          <button id="btn-seguir-pauta" type="button" hidden class="text-sm px-3 py-1.5 rounded-lg whitespace-nowrap"></button>
+        </div>
       </div>
       <div class="flex flex-wrap gap-2 mb-3">
         <input id="filtro-deputado" type="search" placeholder="Filtrar por nome ou partido…"
@@ -403,6 +406,31 @@ $('#form-recentes').addEventListener('submit', async e => {
   } catch { box.innerHTML = '<p class="text-sm text-red-700">Erro ao consultar a API da Câmara. Tente novamente.</p>'; }
 });
 
+/* ---------- Seguir a pauta direto do resultado da votação ----------
+   "Seguindo" guarda proposições, mas aqui só temos o id da votação; o
+   detalhe da votação traz a proposição por trás dela. */
+let __pautaAtual = null;
+async function proposicaoDaVotacao(votacaoId){
+  const r = await fetch(`${API}/votacoes/${encodeURIComponent(votacaoId)}`);
+  if (!r.ok) throw new Error('Votação HTTP '+r.status);
+  const d = (await r.json()).dados || {};
+  const p = d.proposicaoObjeto || (d.proposicoesAfetadas||[])[0] || (d.objetosPossiveis||[])[0];
+  if (!p || !p.id) return null;
+  const titulo = p.siglaTipo && p.numero ? `${p.siglaTipo} ${p.numero}${p.ano?'/'+p.ano:''}` : `Proposição ${p.id}`;
+  return { id: p.id, titulo, ementa: (p.ementa||'').slice(0,300) };
+}
+function pintarSeguirPauta(){
+  const b = $('#btn-seguir-pauta');
+  if (!__pautaAtual){ b.hidden = true; return; }
+  const on = seguePauta(__pautaAtual.id);
+  b.hidden = false;
+  b.className = `text-sm px-3 py-1.5 rounded-lg whitespace-nowrap ${on?'border border-slate-300 text-ink-700 hover:bg-slate-100':'bg-brand-600 hover:bg-brand-700 text-white'}`;
+  b.textContent = on ? 'Seguindo ✓' : `Seguir ${__pautaAtual.titulo}`;
+  b.setAttribute('aria-pressed', on);
+  b.setAttribute('aria-label', `${on?'Deixar de seguir':'Seguir'} a pauta ${__pautaAtual.titulo}`);
+}
+$('#btn-seguir-pauta').onclick = () => { if (__pautaAtual) togglePauta(__pautaAtual); };
+
 /* ---------- Votos nominais de uma votação ---------- */
 async function carregarVotos(id, titulo){
   selectTab($('#tab-votacoes'));
@@ -412,6 +440,9 @@ async function carregarVotos(id, titulo){
   $('#votos-meta').textContent = 'Carregando votos…';
   $('#votos-tabela').innerHTML = ''; $('#votos-resumo').textContent = '';
   $('#votos-link').href = `https://www.camara.leg.br/votacoes/${encodeURIComponent(id)}`;
+  /* resolve a proposição em paralelo: se falhar, o placar continua valendo */
+  __pautaAtual = null; $('#btn-seguir-pauta').hidden = true;
+  proposicaoDaVotacao(id).then(p => { __pautaAtual = p; pintarSeguirPauta(); }).catch(() => {});
   try {
     const r = await fetch(`${API}/votacoes/${encodeURIComponent(id)}/votos?itens=600`);
     const { dados } = await r.json();
@@ -610,6 +641,7 @@ function renderSeguindo(){
     b.onclick = () => togglePauta(p);
     wrap.append(bVer, b); row.appendChild(wrap); bp.appendChild(row);
   });
+  pintarSeguirPauta();   // mantém o botão do placar coerente com a lista
 }
 
 /* ---------- Portais e candidatos ---------- */
