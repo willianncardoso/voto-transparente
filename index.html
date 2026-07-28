@@ -221,16 +221,16 @@
       </div>
     </form>
 
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
       <h3 class="font-semibold text-ink-900">Meus registros</h3>
       <div class="flex flex-wrap gap-2">
-        <button id="btn-export" class="text-sm border border-slate-300 rounded-lg px-3 py-1.5 hover:bg-slate-100">Exportar (backup)</button>
-        <label class="text-sm border border-slate-300 rounded-lg px-3 py-1.5 hover:bg-slate-100 cursor-pointer">
-          Importar<input id="file-import" type="file" accept="application/json" class="hidden" />
-        </label>
-        <button id="btn-clear" class="text-sm border border-red-300 text-red-700 rounded-lg px-3 py-1.5 hover:bg-red-50">Apagar tudo</button>
+        <button id="btn-export" type="button" class="text-sm border border-slate-300 rounded-lg px-3 py-1.5 hover:bg-slate-100">Exportar backup</button>
+        <button id="btn-import" type="button" class="text-sm border border-slate-300 rounded-lg px-3 py-1.5 hover:bg-slate-100">Importar backup</button>
+        <input id="file-import" type="file" accept="application/json" class="hidden" tabindex="-1" aria-hidden="true" />
+        <button id="btn-clear" type="button" class="text-sm border border-red-300 text-red-700 rounded-lg px-3 py-1.5 hover:bg-red-50">Apagar registros</button>
       </div>
     </div>
+    <p class="text-sm text-ink-700 mb-3">O backup é <strong>um único arquivo JSON</strong> com seus registros de voto <em>e</em> sua lista de seguidos. Ao importar, os itens são somados aos que já existem — nada é sobrescrito nem enviado para fora do aparelho. <strong>Apagar registros</strong> apaga só os registros de voto desta aba.</p>
     <div id="meus-votos" class="space-y-2" aria-live="polite"></div>
   </section>
 
@@ -689,22 +689,51 @@ function renderMeusVotos(){
     </div>`).join('');
   $$('[data-del]', box).forEach(b => b.onclick = () => { saveVotos(loadVotos().filter(x => x.id != b.dataset.del)); renderMeusVotos(); });
 }
+/* ---------- Backup único: registros de voto + lista de seguidos ---------- */
+const BACKUP_VERSAO = 1;
 $('#btn-export').onclick = () => {
-  const blob = new Blob([JSON.stringify(loadVotos(),null,2)], {type:'application/json'});
-  const a = el('a'); a.href = URL.createObjectURL(blob); a.download = 'meus-votos-backup.json'; a.click(); URL.revokeObjectURL(a.href);
+  const backup = {
+    app: 'voto-transparente', versao: BACKUP_VERSAO, exportadoEm: new Date().toISOString(),
+    [SEG_KEY]: loadSeg(), [KEY]: loadVotos()
+  };
+  const blob = new Blob([JSON.stringify(backup,null,2)], {type:'application/json'});
+  const a = el('a'); a.href = URL.createObjectURL(blob); a.download = 'voto-transparente-backup.json'; a.click(); URL.revokeObjectURL(a.href);
 };
+/* soma sem duplicar; devolve quantos entraram de fato */
+function mesclarPorId(destino, origem){
+  if (!Array.isArray(origem)) return 0;
+  const ids = new Set(destino.map(x => String(x.id)));
+  let n = 0;
+  origem.forEach(x => { if (x && x.id != null && !ids.has(String(x.id))) { destino.push(x); ids.add(String(x.id)); n++; } });
+  return n;
+}
+function importarBackup(imp){
+  /* backups antigos eram só o array de registros de voto */
+  const antigo = Array.isArray(imp);
+  const votosImp = antigo ? imp : imp?.[KEY];
+  const segImp = antigo ? {} : (imp?.[SEG_KEY] || {});
+  if (!Array.isArray(votosImp) && !Array.isArray(segImp.cand) && !Array.isArray(segImp.pauta)) throw new Error('formato desconhecido');
+  const votos = loadVotos(), nv = mesclarPorId(votos, votosImp || []); saveVotos(votos);
+  const s = loadSeg();
+  const nc = mesclarPorId(s.cand, segImp.cand), np = mesclarPorId(s.pauta, segImp.pauta);
+  saveSeg(s);
+  return `Backup importado: ${nv} registro(s) de voto, ${nc} seguido(s) e ${np} pauta(s) adicionados.`;
+}
+$('#btn-import').onclick = () => $('#file-import').click();
 $('#file-import').onchange = e => {
   const f = e.target.files[0]; if(!f) return;
   const rd = new FileReader();
-  rd.onload = () => { try {
-      const imp = JSON.parse(rd.result); if (!Array.isArray(imp)) throw 0;
-      const cur = loadVotos(), ids = new Set(cur.map(x=>x.id));
-      imp.forEach(x => { if(!ids.has(x.id)) cur.push(x); });
-      saveVotos(cur); renderMeusVotos(); alert('Registros importados.');
-    } catch { alert('Arquivo inválido.'); } };
+  rd.onload = () => {
+    let resumo;
+    try { resumo = importarBackup(JSON.parse(rd.result)); }
+    catch { alert('Arquivo inválido. Escolha um backup exportado pelo Voto Transparente.'); return; }
+    renderMeusVotos(); renderSeguindo();
+    alert(resumo);
+  };
+  rd.onerror = () => alert('Não foi possível ler o arquivo.');
   rd.readAsText(f); e.target.value = '';
 };
-$('#btn-clear').onclick = () => { if (confirm('Apagar TODOS os seus registros deste aparelho? Isso não pode ser desfeito.')) { localStorage.removeItem(KEY); renderMeusVotos(); } };
+$('#btn-clear').onclick = () => { if (confirm('Apagar TODOS os seus registros de voto deste aparelho? Sua lista de seguidos não é afetada. Isso não pode ser desfeito.')) { localStorage.removeItem(KEY); renderMeusVotos(); } };
 
 /* ---------- Init ----------
    restaurarUI() vem antes de renderCandidatos() para o filtro de nível já
