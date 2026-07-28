@@ -310,6 +310,32 @@ function toggleCand(obj){ const s=loadSeg(); const i=s.cand.findIndex(c=>String(
 function togglePauta(obj){ const s=loadSeg(); const i=s.pauta.findIndex(p=>String(p.id)===String(obj.id));
   if(i>=0) s.pauta.splice(i,1); else s.pauta.push(obj); saveSeg(s); renderSeguindo(); }
 
+/* ---------- Preferências de interface (aba aberta e filtros) ----------
+   Chave separada das duas de dados: são só conveniências de navegação e
+   por isso ficam de fora do backup exportado. */
+const UI_KEY = 'voto-transparente:ui';
+const FILTROS = ['#dias','#q-cand','#q-cand-casa','#q-cand-uf','#q-pauta','#q-pauta-ano','#filtro-nivel'];
+const loadUI = () => { try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch { return {}; } };
+/* localStorage pode falhar (aba anônima, cota cheia): preferências não valem um erro */
+const saveUI = patch => { try { localStorage.setItem(UI_KEY, JSON.stringify({ ...loadUI(), ...patch })); } catch {} };
+function salvarFiltros(){
+  const filtros = {};
+  FILTROS.forEach(sel => { const n = $(sel); if (n) filtros[sel] = n.value; });
+  saveUI({ filtros });
+}
+function restaurarUI(){
+  const ui = loadUI(), filtros = ui.filtros || {};
+  FILTROS.forEach(sel => { const n = $(sel); if (n && filtros[sel] != null) n.value = filtros[sel]; });
+  const tab = tabs.find(t => t.id === ui.aba);   // compara com a lista real: id salvo nunca vira seletor
+  if (tab) selectTab(tab);
+}
+FILTROS.forEach(sel => {
+  const n = $(sel);
+  if (!n) return;
+  n.addEventListener('change', salvarFiltros);
+  n.addEventListener('input', salvarFiltros);
+});
+
 /* ---------- Tabs (acessível) ---------- */
 const tabs = $$('[role="tab"]');
 tabs.forEach(tab => {
@@ -322,6 +348,7 @@ tabs.forEach(tab => {
 });
 function selectTab(tab){
   tabs.forEach(t => { const sel = t === tab; t.setAttribute('aria-selected', sel); $('#'+t.getAttribute('aria-controls')).hidden = !sel; });
+  saveUI({ aba: tab.id });
 }
 
 /* ---------- Câmara: cores por voto ---------- */
@@ -647,7 +674,10 @@ $('#file-import').onchange = e => {
 };
 $('#btn-clear').onclick = () => { if (confirm('Apagar TODOS os seus registros deste aparelho? Isso não pode ser desfeito.')) { localStorage.removeItem(KEY); renderMeusVotos(); } };
 
-/* ---------- Init ---------- */
+/* ---------- Init ----------
+   restaurarUI() vem antes de renderCandidatos() para o filtro de nível já
+   valer na primeira pintura. */
+restaurarUI();
 renderPautas(); renderPortais(); renderCandidatos(); renderMeusVotos(); renderSeguindo();
 </script>
 </body>
