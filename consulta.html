@@ -55,6 +55,13 @@ const API = "https://dadosabertos.camara.leg.br/api/v2";
 const $ = s => document.querySelector(s);
 const el = (t,cls,html)=>{const e=document.createElement(t); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e;};
 const esc = s => String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* id de seguido: "local:Nome" (lista local), "sen:123" (Senado), numérico puro (Câmara) */
+function perfilUrl(id){
+  const s = String(id??"");
+  if (s.startsWith('local:')) return '';
+  if (s.startsWith('sen:')) return `https://www25.senado.leg.br/web/senadores/senador/-/perfil/${encodeURIComponent(s.slice(4))}`;
+  return `https://www.camara.leg.br/deputados/${encodeURIComponent(s)}`;
+}
 const seg = (()=>{ try{ const s=JSON.parse(localStorage.getItem('voto-transparente:seguindo')); return s&&s.cand?s:{cand:[],pauta:[]}; }catch{ return {cand:[],pauta:[]}; } })();
 const voteColor = v => { const s=(v||'').toLowerCase();
   if(s.startsWith('sim'))return 'bg-green-100 text-green-800';
@@ -67,7 +74,7 @@ const voteColor = v => { const s=(v||'').toLowerCase();
 const cbox = $('#cand');
 if(!seg.cand.length){ cbox.innerHTML = '<p class="text-sm text-ink-700 sm:col-span-2 bg-white border border-slate-200 rounded-xl p-4">Você ainda não segue ninguém. Use o app para buscar e seguir.</p>'; }
 seg.cand.forEach(c => {
-  const perfil = String(c.id).startsWith('local:') ? '' : `https://www.camara.leg.br/deputados/${c.id}`;
+  const perfil = perfilUrl(c.id);
   const card = el('article','bg-white border border-slate-200 rounded-xl p-3 flex gap-3 items-center');
   card.innerHTML = `${c.foto?`<img src="${esc(c.foto)}" alt="" class="w-11 h-11 rounded-full object-cover bg-slate-100"/>`:'<div aria-hidden="true" class="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center">👤</div>'}
     <div class="min-w-0"><p class="font-medium text-ink-900 truncate">${esc(c.nome)}</p>

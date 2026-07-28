@@ -118,12 +118,17 @@
       <form id="form-busca-cand" class="flex flex-wrap gap-2">
         <input id="q-cand" type="search" placeholder="Nome (ex.: Silva)"
           class="flex-1 min-w-[200px] border border-slate-300 rounded-lg px-3 py-2 text-sm" aria-label="Nome do candidato" />
+        <select id="q-cand-casa" class="border border-slate-300 rounded-lg px-3 py-2 text-sm" aria-label="Filtrar por casa legislativa">
+          <option value="">Câmara e Senado</option>
+          <option value="camara">Só Câmara</option>
+          <option value="senado">Só Senado</option>
+        </select>
         <select id="q-cand-uf" class="border border-slate-300 rounded-lg px-3 py-2 text-sm" aria-label="Filtrar por UF">
           <option value="">UF (todas)</option>
         </select>
         <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg">Buscar</button>
       </form>
-      <p class="text-xs text-ink-700 mt-2">Busca deputados federais em exercício (API da Câmara) e a lista local de candidatos. Candidaturas 2026 aparecem no TSE mais perto da eleição.</p>
+      <p class="text-xs text-ink-700 mt-2">Busca deputados federais (API da Câmara) e senadores (API do Senado) em exercício, além da lista local de candidatos. Candidaturas 2026 aparecem no TSE mais perto da eleição.</p>
       <div id="cand-results" class="mt-4 grid sm:grid-cols-2 gap-3" aria-live="polite"></div>
     </div>
 
@@ -275,11 +280,24 @@ const PORTAIS = [
    DAQUI PRA BAIXO: lógica do app. Não precisa editar.
    ===================================================================== */
 const API = "https://dadosabertos.camara.leg.br/api/v2";
+const API_SENADO = "https://legis.senado.leg.br/dadosabertos";
+const SENADO_EM_EXERCICIO = "https://www25.senado.leg.br/web/senadores/em-exercicio";
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const el = (t, cls, html) => { const e=document.createElement(t); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; };
 const esc = s => String(s??"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* compara ignorando acentos e maiúsculas (nomes brasileiros) */
+const norm = s => String(s??"").toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
+/* o Senado devolve URLs em http: — força https para não virar conteúdo misto no Pages */
+const httpsUrl = u => String(u??"").replace(/^http:\/\//i,'https://');
+/* id de seguido: "local:Nome" (lista local), "sen:123" (Senado), numérico puro (Câmara) */
+function perfilUrl(id){
+  const s = String(id??"");
+  if (s.startsWith('local:')) return '';
+  if (s.startsWith('sen:')) return `https://www25.senado.leg.br/web/senadores/senador/-/perfil/${encodeURIComponent(s.slice(4))}`;
+  return `https://www.camara.leg.br/deputados/${encodeURIComponent(s)}`;
+}
 
 /* ---------- Store de "seguindo" (localStorage, só neste aparelho) ---------- */
 const SEG_KEY = 'voto-transparente:seguindo';
@@ -399,25 +417,75 @@ $('#filtro-deputado').addEventListener('input', e => {
 
 /* ---------- Buscar candidatos / parlamentares ---------- */
 $('#q-cand-uf').innerHTML = '<option value="">UF (todas)</option>' + UFS.map(u=>`<option>${u}</option>`).join('');
+
+/* Câmara: a própria API filtra por nome e UF */
+async function buscarDeputados(q, uf){
+  const params = new URLSearchParams({ ordem:'ASC', ordenarPor:'nome', itens:'30' });
+  if (q) params.set('nome', q);
+  if (uf) params.set('siglaUf', uf);
+  const r = await fetch(`${API}/deputados?${params}`);
+  if (!r.ok) throw new Error('Câmara HTTP '+r.status);
+  return ((await r.json()).dados || []).map(d => ({
+    id: d.id, nome: d.nome, siglaPartido: d.siglaPartido, siglaUf: d.siglaUf,
+    urlFoto: d.urlFoto, fonte: 'Deputado(a) Federal'
+  }));
+}
+
+/* Senado: não há endpoint de busca por nome — baixa a lista em exercício (81 nomes)
+   uma vez, guarda em memória e filtra aqui mesmo. */
+let __senadores = null;
+async function carregarSenadores(){
+  if (__senadores) return __senadores;
+  const r = await fetch(`${API_SENADO}/senador/lista/atual.json`, { headers: { Accept: 'application/json' } });
+  if (!r.ok) throw new Error('Senado HTTP '+r.status);
+  const lista = (await r.json())?.ListaParlamentarEmExercicio?.Parlamentares?.Parlamentar || [];
+  __senadores = (Array.isArray(lista) ? lista : [lista]).map(p => {
+    const i = p.IdentificacaoParlamentar || {};
+    return {
+      id: 'sen:' + i.CodigoParlamentar,
+      nome: i.NomeParlamentar || i.NomeCompletoParlamentar || '—',
+      nomeCompleto: i.NomeCompletoParlamentar || '',
+      siglaPartido: i.SiglaPartidoParlamentar || '',
+      siglaUf: i.UfParlamentar || p.Mandato?.UfParlamentar || '',
+      urlFoto: httpsUrl(i.UrlFotoParlamentar),
+      fonte: 'Senador(a)'
+    };
+  }).sort((a,b) => a.nome.localeCompare(b.nome,'pt-BR'));
+  return __senadores;
+}
+async function buscarSenadores(q, uf){
+  const nq = norm(q);
+  return (await carregarSenadores())
+    .filter(s => (!nq || norm(s.nome).includes(nq) || norm(s.nomeCompleto).includes(nq)) && (!uf || s.siglaUf === uf))
+    .slice(0, 30);
+}
+
 $('#form-busca-cand').addEventListener('submit', async e => {
   e.preventDefault();
-  const q = $('#q-cand').value.trim(), uf = $('#q-cand-uf').value, box = $('#cand-results');
+  const q = $('#q-cand').value.trim(), uf = $('#q-cand-uf').value, casa = $('#q-cand-casa').value;
+  const box = $('#cand-results');
   box.innerHTML = '<p class="text-sm text-ink-700 sm:col-span-2">Buscando…</p>';
-  let dep = [];
-  try {
-    const params = new URLSearchParams({ ordem:'ASC', ordenarPor:'nome', itens:'30' });
-    if (q) params.set('nome', q);
-    if (uf) params.set('siglaUf', uf);
-    const r = await fetch(`${API}/deputados?${params}`);
-    dep = (await r.json()).dados || [];
-  } catch {}
-  // candidatos locais
-  const locais = CANDIDATOS.filter(c => (!q || c.nome.toLowerCase().includes(q.toLowerCase())) && (!uf || c.uf===uf))
+  const avisos = [];
+  const [dep, sen] = await Promise.all([
+    casa === 'senado' ? [] : buscarDeputados(q, uf).catch(() => {
+      avisos.push('Não foi possível consultar a API da Câmara agora. Tente de novo em instantes ou veja a <a class="underline" href="https://www.camara.leg.br/deputados/quem-sao" target="_blank" rel="noopener">lista oficial de deputados ↗</a>.');
+      return [];
+    }),
+    casa === 'camara' ? [] : buscarSenadores(q, uf).catch(() => {
+      avisos.push(`Não foi possível consultar a API do Senado agora. Veja a <a class="underline" href="${SENADO_EM_EXERCICIO}" target="_blank" rel="noopener">lista oficial de senadores em exercício ↗</a>.`);
+      return [];
+    })
+  ]);
+  /* a lista local não é Câmara nem Senado: só entra quando nenhuma casa é filtrada */
+  const locais = casa ? [] : CANDIDATOS.filter(c => (!q || norm(c.nome).includes(norm(q))) && (!uf || c.uf===uf))
     .map(c => ({ id:'local:'+c.nome, nome:c.nome, siglaPartido:c.partido, siglaUf:c.uf, urlFoto:'', fonte:'Lista local', origem:c }));
-  const cams = dep.map(d => ({ id:d.id, nome:d.nome, siglaPartido:d.siglaPartido, siglaUf:d.siglaUf, urlFoto:d.urlFoto, fonte:'Deputado(a) Federal' }));
-  const all = [...cams, ...locais];
-  if (!all.length){ box.innerHTML = '<p class="text-sm text-ink-700 sm:col-span-2">Nenhum resultado. Tente outro nome ou UF.</p>'; return; }
+  const all = [...dep, ...sen, ...locais];
   box.innerHTML = '';
+  avisos.forEach(a => box.appendChild(el('p','sm:col-span-2 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3', a)));
+  if (!all.length){
+    box.appendChild(el('p','text-sm text-ink-700 sm:col-span-2', avisos.length ? 'Nenhum resultado das fontes disponíveis.' : 'Nenhum resultado. Tente outro nome ou UF.'));
+    return;
+  }
   all.forEach(c => box.appendChild(candCard(c)));
 });
 function candCard(c){
@@ -495,7 +563,7 @@ function renderSeguindo(){
   bc.innerHTML = s.cand.length ? '' : '<p class="text-sm text-ink-700 sm:col-span-2">Você ainda não segue ninguém.</p>';
   s.cand.forEach(c => {
     const card = el('article','border border-slate-200 rounded-lg p-3 flex gap-3 items-center');
-    const perfil = String(c.id).startsWith('local:') ? '' : `https://www.camara.leg.br/deputados/${c.id}`;
+    const perfil = perfilUrl(c.id);
     card.innerHTML = `${c.foto?`<img src="${esc(c.foto)}" alt="" class="w-10 h-10 rounded-full object-cover bg-slate-100"/>`:'<div aria-hidden="true" class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">👤</div>'}
       <div class="min-w-0 flex-1"><p class="font-medium text-ink-900 truncate">${esc(c.nome)}</p>
       <p class="text-xs text-ink-700">${esc(c.partido||'')}${c.uf?'-'+esc(c.uf):''}${perfil?` · <a href="${perfil}" target="_blank" rel="noopener" class="text-brand-600 underline">perfil ↗</a>`:''}</p></div>`;
