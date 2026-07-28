@@ -294,6 +294,22 @@ const esc = s => String(s??"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;',
 const norm = s => String(s??"").toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
 /* o Senado devolve URLs em http: — força https para não virar conteúdo misto no Pages */
 const httpsUrl = u => String(u??"").replace(/^http:\/\//i,'https://');
+/* As APIs públicas falham de forma intermitente ("Failed to fetch", 5xx). Uma
+   segunda tentativa resolve a maioria dos casos e evita mostrar erro à toa. */
+async function apiJSON(url, opts, tentativas = 2){
+  let ultimo;
+  for (let i = 0; i < tentativas; i++){
+    try {
+      const r = await fetch(url, opts);
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      return await r.json();
+    } catch (e) {
+      ultimo = e;
+      if (i < tentativas-1) await new Promise(res => setTimeout(res, 600));
+    }
+  }
+  throw ultimo;
+}
 /* id de seguido: "local:Nome" (lista local), "sen:123" (Senado), numérico puro (Câmara) */
 function perfilUrl(id){
   const s = String(id??"");
@@ -389,8 +405,7 @@ $('#form-recentes').addEventListener('submit', async e => {
   box.innerHTML = '<p class="text-sm text-ink-700">Carregando…</p>';
   const fim = new Date(), ini = new Date(Date.now() - dias*864e5), fmt = d => d.toISOString().slice(0,10);
   try {
-    const r = await fetch(`${API}/votacoes?dataInicio=${fmt(ini)}&dataFim=${fmt(fim)}&ordem=DESC&ordenarPor=dataHoraRegistro&itens=40`);
-    const { dados } = await r.json();
+    const { dados } = await apiJSON(`${API}/votacoes?dataInicio=${fmt(ini)}&dataFim=${fmt(fim)}&ordem=DESC&ordenarPor=dataHoraRegistro&itens=40`);
     if (!dados || !dados.length){ box.innerHTML = '<p class="text-sm text-ink-700">Nenhuma votação encontrada no período.</p>'; return; }
     box.innerHTML = '';
     dados.forEach(v => {
@@ -411,9 +426,7 @@ $('#form-recentes').addEventListener('submit', async e => {
    detalhe da votação traz a proposição por trás dela. */
 let __pautaAtual = null;
 async function proposicaoDaVotacao(votacaoId){
-  const r = await fetch(`${API}/votacoes/${encodeURIComponent(votacaoId)}`);
-  if (!r.ok) throw new Error('Votação HTTP '+r.status);
-  const d = (await r.json()).dados || {};
+  const d = (await apiJSON(`${API}/votacoes/${encodeURIComponent(votacaoId)}`)).dados || {};
   const p = d.proposicaoObjeto || (d.proposicoesAfetadas||[])[0] || (d.objetosPossiveis||[])[0];
   if (!p || !p.id) return null;
   const titulo = p.siglaTipo && p.numero ? `${p.siglaTipo} ${p.numero}${p.ano?'/'+p.ano:''}` : `Proposição ${p.id}`;
@@ -444,17 +457,21 @@ async function carregarVotos(id, titulo){
   __pautaAtual = null; $('#btn-seguir-pauta').hidden = true;
   proposicaoDaVotacao(id).then(p => { __pautaAtual = p; pintarSeguirPauta(); }).catch(() => {});
   try {
-    const r = await fetch(`${API}/votacoes/${encodeURIComponent(id)}/votos?itens=600`);
-    const { dados } = await r.json();
+    const { dados } = await apiJSON(`${API}/votacoes/${encodeURIComponent(id)}/votos`);
     const votos = (dados||[]).map(x => { const d = x.deputado_ || x.deputado || {};
       return { nome:d.nome||'—', partido:d.siglaPartido||'', uf:d.siglaUf||'', voto:x.tipoVoto||'—' }; })
-      .sort((a,b)=>a.nome.localeCompare(b.nome));
+      .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
     window.__votos = votos;
+    if (!votos.length){
+      $('#votos-meta').textContent = 'Esta votação não teve votos nominais — foi simbólica ou de comissão. Só votações nominais registram o voto de cada parlamentar.';
+      $('#votos-resumo').textContent = ''; pintarTabela([]);
+      return;
+    }
     const cont = votos.reduce((m,v)=>{ const k=(v.voto||'—'); m[k]=(m[k]||0)+1; return m; },{});
     $('#votos-meta').textContent = `${votos.length} parlamentares registrados`;
     $('#votos-resumo').innerHTML = Object.entries(cont).map(([k,n]) => `<span class="px-2 py-0.5 rounded ${voteColor(k)}">${esc(k)}: ${n}</span>`).join('');
     pintarTabela(votos);
-  } catch { $('#votos-meta').textContent = 'Erro ao carregar os votos. Verifique o ID da votação.'; }
+  } catch { $('#votos-meta').textContent = 'Erro ao carregar os votos. Tente de novo em instantes ou confira na fonte oficial.'; }
 }
 function pintarTabela(votos){
   const box = $('#votos-tabela');
@@ -481,9 +498,7 @@ async function buscarDeputados(q, uf){
   const params = new URLSearchParams({ ordem:'ASC', ordenarPor:'nome', itens:'30' });
   if (q) params.set('nome', q);
   if (uf) params.set('siglaUf', uf);
-  const r = await fetch(`${API}/deputados?${params}`);
-  if (!r.ok) throw new Error('Câmara HTTP '+r.status);
-  return ((await r.json()).dados || []).map(d => ({
+  return ((await apiJSON(`${API}/deputados?${params}`)).dados || []).map(d => ({
     id: d.id, nome: d.nome, siglaPartido: d.siglaPartido, siglaUf: d.siglaUf,
     urlFoto: d.urlFoto, fonte: 'Deputado(a) Federal'
   }));
@@ -494,9 +509,8 @@ async function buscarDeputados(q, uf){
 let __senadores = null;
 async function carregarSenadores(){
   if (__senadores) return __senadores;
-  const r = await fetch(`${API_SENADO}/senador/lista/atual.json`, { headers: { Accept: 'application/json' } });
-  if (!r.ok) throw new Error('Senado HTTP '+r.status);
-  const lista = (await r.json())?.ListaParlamentarEmExercicio?.Parlamentares?.Parlamentar || [];
+  const j = await apiJSON(`${API_SENADO}/senador/lista/atual.json`, { headers: { Accept: 'application/json' } });
+  const lista = j?.ListaParlamentarEmExercicio?.Parlamentares?.Parlamentar || [];
   __senadores = (Array.isArray(lista) ? lista : [lista]).map(p => {
     const i = p.IdentificacaoParlamentar || {};
     return {
@@ -571,8 +585,7 @@ $('#form-busca-pauta').addEventListener('submit', async e => {
     const params = new URLSearchParams({ ordem:'DESC', ordenarPor:'id', itens:'20' });
     if (q) params.set('keywords', q);
     if (ano) params.set('ano', ano);
-    const r = await fetch(`${API}/proposicoes?${params}`);
-    const dados = (await r.json()).dados || [];
+    const dados = (await apiJSON(`${API}/proposicoes?${params}`)).dados || [];
     if (!dados.length){ box.innerHTML = '<p class="text-sm text-ink-700">Nenhuma proposição encontrada.</p>'; return; }
     box.innerHTML = '';
     dados.forEach(p => box.appendChild(pautaCard(p)));
@@ -602,8 +615,7 @@ async function abrirVotacoesDaProposicao(id, titulo){
   const note = el('div','text-sm text-ink-700 border border-slate-100 rounded-lg p-3 mt-2','Carregando votações…');
   box.appendChild(note);
   try {
-    const r = await fetch(`${API}/proposicoes/${id}/votacoes?ordem=DESC&ordenarPor=dataHoraRegistro`);
-    const dados = (await r.json()).dados || [];
+    const dados = (await apiJSON(`${API}/proposicoes/${encodeURIComponent(id)}/votacoes?ordem=DESC&ordenarPor=dataHoraRegistro`)).dados || [];
     if (!dados.length){ note.textContent = 'Esta proposição não tem votações nominais registradas na Câmara.'; return; }
     note.innerHTML = `<p class="font-medium text-ink-900 mb-1">Votações de ${esc(titulo)}</p>`;
     dados.forEach(v => {
